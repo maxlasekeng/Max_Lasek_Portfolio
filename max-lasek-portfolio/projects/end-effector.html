@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Robotic End Effector | Max Lasek</title>
+<meta name="description" content="A worm-gear-driven 4-bar gripper for UB Space Bulls’ University Rover Challenge arm. I led its mechanical design.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' fill='%23132238'/%3E%3Ctext x='32' y='44' font-family='Arial Narrow,Arial' font-weight='700' font-size='34' fill='%23fff' text-anchor='middle'%3EML%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+  <div class="wrap">
+    <a class="wordmark" href="../index.html">Max Lasek</a>
+    <nav class="site-nav" aria-label="Main">
+      <a href="../index.html#projects">Projects</a>
+      <a class="hide-sm" href="../index.html#skills">Skills</a>
+      <a class="hide-sm" href="../index.html#experience">Experience</a>
+      <a href="../index.html#contact">Contact</a>
+      <a class="button" href="../resume/Max-Lasek-Resume.pdf">Résumé</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+  <div class="wrap">
+    <a class="back" href="../index.html#projects">All projects</a>
+    <header class="project-head">
+      <h1>Robotic End Effector</h1>
+      <p class="when">Aug 2025 to present<span class="status active">In progress</span></p>
+      <p class="lede">A worm-gear-driven 4-bar gripper for UB Space Bulls’ University Rover Challenge arm. I led its mechanical design.</p>
+    </header>
+    <div class="figures two">
+      <figure><img src="../images/effector-iso.jpg" alt="Angled CAD render of the end effector showing the main body, brass heat-set inserts, and servo mount" width="703" height="494"><figcaption>Main body, fingers, and servo mount</figcaption></figure>
+      <figure><img src="../images/effector-top.jpg" alt="Top-down CAD render of the end effector with fingers open, showing the worm gear between two spur gears" width="607" height="642"><figcaption>Top view with the worm and both spur gears visible</figcaption></figure>
+    </div>
+    <div class="detail">
+      <div>
+      <h2>The problem</h2>
+      <p>The arm needs one device that can pick up a crate, type on a keyboard, and place a test tube in a cabinet and close the door. It also has to stay light, because every gram at the end of the arm is torque the joints behind it have to supply.</p>
+      <h2>How it works</h2>
+      <p>A servo spins a worm gear that drives two spur gears at a 24:1 reduction. Each spur gear moves a 4-bar linkage, so the two fingers close together. The opening at the front grabs small objects, and the wider section behind it holds larger ones when the fingers are closed.</p>
+      <h2>What I did</h2>
+      <p>I designed the main body and the joint that connects it to the team’s differential wrist. I designed the current PLA fingers and am working with teammates on TPU grips, comparing styles such as concave pads and compliant adaptive grips. I tested tolerances on every component, assembled the gripper, and programmed the servo with an Arduino Uno to open and close the fingers.</p>
+      <h2>What testing showed</h2>
+      <p>Driving the first build from the Arduino revealed major backlash in the gears and heavy friction in the linkage. I worked through both by testing different gear designs, adjusting tolerances, and adding brass heat-set inserts and ball bearings.</p>
+      <h2>Key decisions</h2>
+      <p>I chose the worm-driven 4-bar because of the clamping torque it provides. With a 25 kg·cm HiWonder HPS-2027 servo and the 24:1 reduction, the gripper has a 2.5× clamping torque safety margin for a 5 kg lift. I used M4 screws throughout to standardize hardware, and printed most of the gripper in PLA to keep it light.</p>
+      <h2>Alternatives I considered</h2>
+      <h3>Lead screw</h3>
+      <p>A lead screw could slide the fingers side to side instead of clamping. It provides less torque than the 4-bar, so I moved away from it.</p>
+      <h3>Hot-swappable end effectors</h3>
+      <p>The connecting joint could be made hot-swappable to accept a second gripper or a science module. Our science module is no longer going on the arm, so a second end effector isn’t needed right now.</p>
+      <h2>Next iterations</h2>
+      <p>Run empirical tests on TPU grip geometry, upgrade the plastic gears to metal to reduce backlash, and find a more stable connection between the servo and the worm screw.</p>
+      </div>
+      <aside class="side"><h2>Specifications</h2><ul><li><span>Mechanism</span>4-bar linkage, worm gear drive</li><li><span>Servo</span>HiWonder HPS-2027, 25 kg·cm</li><li><span>Reduction</span>24:1</li><li><span>Payload</span>Up to 5 kg (11 lb)</li><li><span>Clamping torque margin</span>2.5×</li><li><span>Fasteners</span>M4 throughout</li></ul><h2>Skills used</h2><ul><li>Fusion 360</li><li>3D printing</li><li>Assembly</li><li>Arduino coding</li><li>Gear ratios</li></ul></aside>
+    </div>
+    <nav class="pager" aria-label="More projects">
+      <a href="rc-av-car.html">Previous: RC / Autonomous Car</a>
+      <a href="practice-arm.html">Next: 3-DOF Practice Arm</a>
+    </nav>
+  </div>
+</main>
+
+<footer class="contact" id="contact">
+  <div class="wrap">
+    <h2>Get in touch</h2>
+    <div class="links">
+      <a href="mailto:maxlasekeng@gmail.com">maxlasekeng@gmail.com</a>
+      <a href="https://www.linkedin.com/in/max-lasek">linkedin.com/in/max-lasek</a>
+    </div>
+    <small>© 2026 Max Lasek</small>
+  </div>
+</footer>
+</body>
+</html>
