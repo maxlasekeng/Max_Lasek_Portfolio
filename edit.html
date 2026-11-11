@@ -13,7 +13,7 @@ html,body{height:100%;margin:0}
 body{background:var(--bg);color:var(--ink);font:400 15px/1.5 "Helvetica Neue",Arial,sans-serif;display:flex;flex-direction:column}
 .bar{display:flex;align-items:center;gap:.6rem .9rem;flex-wrap:wrap;padding:.6rem 1rem;background:var(--surface);border-bottom:1.5px solid var(--ink)}
 .bar strong{font-size:1.05rem}
-select,button,input{font:inherit;color:inherit}
+select,button,input,textarea{font:inherit;color:inherit}
 select{padding:.4rem .5rem;border:1px solid var(--line);background:var(--bg);border-radius:2px}
 button{padding:.45rem .9rem;border:1.5px solid var(--ink);background:transparent;border-radius:2px;font-weight:600;cursor:pointer}
 button:hover:not(:disabled){background:var(--ink);color:var(--bg)}
@@ -32,7 +32,20 @@ iframe{flex:1;width:100%;border:0;background:var(--bg)}
 .setup li{margin-bottom:.5rem}
 .setup label{display:block;font-weight:600;margin-top:1.25rem}
 .setup input{width:100%;padding:.6rem;border:1px solid var(--line);background:var(--bg);border-radius:2px;margin:.35rem 0 1rem}
-.msg{color:var(--red);min-height:1.5em;margin:.75rem 0 0}
+.msg{color:var(--muted);min-height:1.5em;margin:.75rem 0 0}
+.msg.err{color:var(--red)}
+dialog{border:1.5px solid var(--ink);background:var(--surface);color:var(--ink);padding:1.75rem;width:min(100% - 2rem,38rem);border-radius:2px}
+dialog::backdrop{background:rgba(10,20,40,.55)}
+dialog h2{margin:0 0 .4rem;font-size:1.5rem;line-height:1.15}
+dialog label,dialog legend{display:block;font-weight:600;margin:1rem 0 .3rem;padding:0}
+dialog input:not([type=file]),dialog textarea,dialog select{width:100%;padding:.5rem .6rem;border:1px solid var(--line);background:var(--bg);border-radius:2px}
+dialog textarea{resize:vertical}
+dialog fieldset{border:0;padding:0;margin:0}
+dialog .row{display:grid;grid-template-columns:1fr 10rem;gap:0 1rem}
+dialog .nums{display:grid;grid-template-columns:repeat(3,1fr);gap:.6rem}
+dialog .nums div{display:grid;gap:.35rem}
+dialog .buttons{display:flex;justify-content:flex-end;gap:.6rem;margin-top:.5rem}
+@media (max-width:32rem){dialog .row,dialog .nums{grid-template-columns:1fr}}
 .hint{color:var(--muted);font-size:.875rem}
 [hidden]{display:none!important}
 :focus-visible{outline:3px solid var(--yellow);outline-offset:2px}
@@ -52,7 +65,7 @@ iframe{flex:1;width:100%;border:0;background:var(--bg)}
   <label for="token">GitHub token</label>
   <input id="token" type="password" autocomplete="off" spellcheck="false" placeholder="github_pat_…">
   <button id="connect" class="primary">Connect</button>
-  <p class="msg" id="setupMsg" role="alert"></p>
+  <p class="msg err" id="setupMsg" role="alert"></p>
   <p class="hint">The key is stored only in this browser. Click “Sign out” in the editor to remove it.</p>
 </section>
 
@@ -60,6 +73,8 @@ iframe{flex:1;width:100%;border:0;background:var(--bg)}
   <strong>Site editor</strong>
   <select id="page" aria-label="Page to edit"></select>
   <span class="status" id="status" role="status"></span>
+  <button id="newProject">New project</button>
+  <button id="deleteProject" hidden>Delete project</button>
   <button id="discard" disabled>Discard changes</button>
   <button id="save" class="primary" disabled>Save changes</button>
   <a id="live" href="./" target="_blank" rel="noopener">View live site</a>
@@ -68,6 +83,37 @@ iframe{flex:1;width:100%;border:0;background:var(--bg)}
 <iframe id="frame" title="Page being edited" hidden></iframe>
 <input type="file" id="picker" accept="image/jpeg,image/png,image/webp" hidden>
 
+<dialog id="newDlg" aria-labelledby="newTitle">
+  <form id="newForm">
+    <h2 id="newTitle">New project</h2>
+    <p class="hint">This makes a page for the project, adds it to the bottom of your home page, and links it to your other projects. You can change all of it afterward.</p>
+    <label for="npTitle">Project name</label>
+    <input id="npTitle" maxlength="80" placeholder="e.g. Differential Wrist" required>
+    <div class="row">
+      <div><label for="npDates">Dates</label><input id="npDates" maxlength="60" placeholder="e.g. Jan 2026 to present"></div>
+      <div><label for="npStatus">Status</label><select id="npStatus"><option>In progress</option><option>Complete</option></select></div>
+    </div>
+    <label for="npSummary">Summary (one or two sentences)</label>
+    <textarea id="npSummary" rows="3" maxlength="500" placeholder="What it is and what it has to do."></textarea>
+    <fieldset>
+      <legend>Key numbers (optional)</legend>
+      <p class="hint" style="margin:0 0 .5rem">Up to three figures shown on the home page, like “5 kg” and “Payload”.</p>
+      <div class="nums">
+        <div><input class="numV" maxlength="20" placeholder="5 kg" aria-label="Number 1"><input class="numL" maxlength="40" placeholder="Payload" aria-label="What number 1 measures"></div>
+        <div><input class="numV" maxlength="20" placeholder="24:1" aria-label="Number 2"><input class="numL" maxlength="40" placeholder="Gear reduction" aria-label="What number 2 measures"></div>
+        <div><input class="numV" maxlength="20" placeholder="2 weeks" aria-label="Number 3"><input class="numL" maxlength="40" placeholder="Design to build" aria-label="What number 3 measures"></div>
+      </div>
+    </fieldset>
+    <label for="npPhoto">Cover photo (optional)</label>
+    <input id="npPhoto" type="file" accept="image/jpeg,image/png,image/webp">
+    <p class="msg" id="npMsg" role="status"></p>
+    <div class="buttons">
+      <button type="button" id="npCancel">Cancel</button>
+      <button type="submit" class="primary" id="npCreate">Create project</button>
+    </div>
+  </form>
+</dialog>
+
 <script>
 (function () {
   var OWNER = 'maxlasekeng', REPO = 'Max_Lasek_Portfolio', BRANCH = 'main';
@@ -75,11 +121,15 @@ iframe{flex:1;width:100%;border:0;background:var(--bg)}
   var API = REPO_API + '/contents/';
   var KEY = 'portfolio-editor-token';
   var SITE = new URL('./', location.href).href;
-  var PAGES = [
-    { path: 'index.html', label: 'Home page' },
-    { path: 'projects/end-effector.html', label: 'Robotic End Effector' },
-    { path: 'projects/practice-arm.html', label: '3-DOF Practice Arm' },
-    { path: 'projects/rc-av-car.html', label: 'RC / Autonomous Car' }
+  var HOME = { path: 'index.html', label: 'Home page' };
+  var pages = [HOME], projects = [];
+  var PLACEHOLDER = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600"><rect width="800" height="600" fill="#c4ccd6"/><text x="400" y="312" font-family="Arial,sans-serif" font-size="34" fill="#55657a" text-anchor="middle">Photo coming soon</text></svg>');
+  var SECTIONS = [
+    ['The problem', '[What problem does this project solve, and why did it need to exist?]'],
+    ['How it works', '[Explain how the design works.]'],
+    ['What I did', '[Describe your part: what you designed, built, tested, or programmed.]'],
+    ['Key decisions', '[What choices did you make, and why?]'],
+    ['Next steps', '[What would you improve or try next?]']
   ];
   var HELP = 'Click any text to edit it. Click a photo to replace it. Press Enter at the end of a paragraph to add a new one.';
   var EDIT_CSS =
@@ -91,6 +141,7 @@ iframe{flex:1;width:100%;border:0;background:var(--bg)}
 
   var $ = function (id) { return document.getElementById(id); };
   var frame = $('frame'), picker = $('picker'), select = $('page');
+  var fresh = {}; /* photos uploaded this session, shown from memory until GitHub publishes them */
   var token = null, current = null, sha = null, dirty = false, busy = false, pending = [], imgTarget = null;
 
   function getToken() { try { return localStorage.getItem(KEY); } catch (e) { return null; } }
@@ -101,6 +152,8 @@ iframe{flex:1;width:100%;border:0;background:var(--bg)}
     $('save').disabled = !dirty || busy;
     $('discard').disabled = !dirty || busy;
     select.disabled = busy;
+    $('newProject').disabled = busy;
+    $('deleteProject').disabled = busy;
   }
   function markDirty() {
     if (busy) return;
@@ -143,7 +196,7 @@ iframe{flex:1;width:100%;border:0;background:var(--bg)}
   function dirOf(path) { var i = path.lastIndexOf('/'); return i > -1 ? path.slice(0, i + 1) : ''; }
 
   /* ---------- Loading a page ---------- */
-  async function loadPage(p) {
+  async function loadPage(p, note) {
     busy = true; setButtons(); setStatus('Loading ' + p.label + '…');
     try {
       var data = await gh(API + p.path + '?ref=' + BRANCH);
@@ -153,7 +206,9 @@ iframe{flex:1;width:100%;border:0;background:var(--bg)}
       html = html.replace(/<\/head>/i, '<style data-editor>' + EDIT_CSS + '</style></head>');
       frame.onload = function () {
         setup(frame.contentDocument);
-        dirty = false; busy = false; setButtons(); setStatus(HELP);
+        dirty = false; busy = false; setButtons();
+        if (note) setStatus(note, 'ok'); else setStatus(HELP);
+        $('deleteProject').hidden = p.path === HOME.path;
         $('live').href = new URL(p.path === 'index.html' ? '' : p.path, SITE).href;
       };
       frame.hidden = false;
@@ -178,6 +233,7 @@ iframe{flex:1;width:100%;border:0;background:var(--bg)}
       el.setAttribute('spellcheck', 'true');
     });
     doc.querySelectorAll('main img').forEach(function (img) {
+      if (fresh[img.src]) { img.setAttribute('data-new-src', img.getAttribute('src')); img.src = fresh[img.src]; }
       img.setAttribute('data-ed-img', '');
       img.setAttribute('title', 'Click to replace this photo');
     });
@@ -288,6 +344,7 @@ iframe{flex:1;width:100%;border:0;background:var(--bg)}
         setStatus('Uploading photo ' + (i + 1) + ' of ' + todo.length + '…');
         await gh(API + todo[i].path, { method: 'PUT', body: { message: 'Add photo via site editor', content: todo[i].b64, branch: BRANCH } });
         todo[i].done = true;
+        fresh[new URL(todo[i].path, SITE).href] = 'data:image/jpeg;base64,' + todo[i].b64;
       }
       setStatus('Saving ' + current.label + '…');
       var html = serialize(frame.contentDocument);
@@ -297,6 +354,7 @@ iframe{flex:1;width:100%;border:0;background:var(--bg)}
         sha: sha, branch: BRANCH
       } });
       sha = res.content.sha; pending = []; dirty = false;
+      if (current.path === HOME.path) refreshPages(html);
       setStatus('Saved. The live site updates in about a minute.', 'ok');
     } catch (e) {
       setStatus(errText(e), 'err');
@@ -304,12 +362,210 @@ iframe{flex:1;width:100%;border:0;background:var(--bg)}
     busy = false; setButtons();
   }
 
-  /* ---------- Wiring ---------- */
-  PAGES.forEach(function (p) {
-    var o = document.createElement('option'); o.value = p.path; o.textContent = p.label; select.appendChild(o);
+  /* ---------- Projects: list, create, delete ---------- */
+  async function getFile(path) {
+    var d = await gh(API + path + '?ref=' + BRANCH);
+    return { sha: d.sha, text: fromB64(d.content) };
+  }
+  async function putFile(path, text, fileSha, message) {
+    var body = { message: message, content: toB64(new TextEncoder().encode(text)), branch: BRANCH };
+    if (fileSha) body.sha = fileSha;
+    var r = await gh(API + path, { method: 'PUT', body: body });
+    return r.content.sha;
+  }
+  function parse(text) { return new DOMParser().parseFromString(text, 'text/html'); }
+  function toHtml(doc) { return '<!DOCTYPE html>\n' + doc.documentElement.outerHTML + '\n'; }
+  function el(doc, tag, attrs, text) {
+    var e = doc.createElement(tag);
+    if (attrs) Object.keys(attrs).forEach(function (k) { e.setAttribute(k, attrs[k]); });
+    if (text != null) e.textContent = text;
+    return e;
+  }
+
+  async function refreshPages(indexText) {
+    if (!indexText) indexText = (await getFile(HOME.path)).text;
+    projects = Array.from(parse(indexText).querySelectorAll('main article.project h3 a')).map(function (a) {
+      return { path: a.getAttribute('href'), label: a.textContent.trim() };
+    });
+    pages = [HOME].concat(projects);
+    var keep = select.value;
+    select.textContent = '';
+    pages.forEach(function (p) { select.appendChild(el(document, 'option', { value: p.path }, p.label)); });
+    if (pages.some(function (p) { return p.path === keep; })) select.value = keep;
+  }
+
+  function fillWhen(doc, p, dates, status) {
+    p.textContent = dates;
+    p.appendChild(el(doc, 'span', { 'class': 'status' + (status === 'In progress' ? ' active' : '') }, status));
+  }
+  function setPager(doc, which, proj) {
+    var a = doc.querySelectorAll('nav.pager a')[which === 'prev' ? 0 : 1];
+    if (!a) return;
+    a.setAttribute('href', proj.path.replace(/^projects\//, ''));
+    a.textContent = (which === 'prev' ? 'Previous: ' : 'Next: ') + proj.label;
+  }
+  async function updatePager(proj, prev, next) {
+    var f = await getFile(proj.path), d = parse(f.text);
+    if (prev) setPager(d, 'prev', prev);
+    if (next) setPager(d, 'next', next);
+    await putFile(proj.path, toHtml(d), f.sha, 'Update project links via site editor');
+  }
+
+  function buildPage(template, info) {
+    var d = parse(template);
+    d.title = info.title + ' | Max Lasek';
+    var md = d.querySelector('meta[name="description"]');
+    if (md) md.setAttribute('content', info.summary || info.title);
+    d.querySelector('.project-head h1').textContent = info.title;
+    fillWhen(d, d.querySelector('.project-head .when'), info.dates, info.status);
+    d.querySelector('.project-head .lede').textContent = info.summary || '[A one-sentence description of the project.]';
+    var figs = el(d, 'div', { 'class': 'figures one' }), fig = el(d, 'figure');
+    fig.appendChild(el(d, 'img', { src: info.pageImg, alt: info.title }));
+    figs.appendChild(fig);
+    var old = d.querySelector('.figures');
+    if (old) old.replaceWith(figs); else d.querySelector('.project-head').after(figs);
+    var body = d.querySelector('.detail > div');
+    body.textContent = '';
+    SECTIONS.forEach(function (s) { body.appendChild(el(d, 'h2', null, s[0])); body.appendChild(el(d, 'p', null, s[1])); });
+    var side = d.querySelector('.detail > aside');
+    side.textContent = '';
+    side.appendChild(el(d, 'h2', null, 'Specifications'));
+    var ul = el(d, 'ul');
+    (info.nums.length ? info.nums : [['[Value]', '[Spec name]']]).forEach(function (n) {
+      var li = el(d, 'li'); li.appendChild(el(d, 'span', null, n[1])); li.appendChild(d.createTextNode(n[0])); ul.appendChild(li);
+    });
+    side.appendChild(ul);
+    side.appendChild(el(d, 'h2', null, 'Skills used'));
+    var ul2 = el(d, 'ul'); ul2.appendChild(el(d, 'li', null, '[Skill]')); side.appendChild(ul2);
+    setPager(d, 'prev', info.prev);
+    setPager(d, 'next', info.next);
+    return toHtml(d);
+  }
+
+  function buildRow(d, info) {
+    var art = el(d, 'article', { 'class': 'project' });
+    var media = el(d, 'a', { 'class': 'project-media', href: info.path, tabindex: '-1', 'aria-hidden': 'true' });
+    media.appendChild(el(d, 'img', { src: info.homeImg, alt: '', loading: 'lazy' }));
+    art.appendChild(media);
+    var div = el(d, 'div'), h3 = el(d, 'h3');
+    h3.appendChild(el(d, 'a', { href: info.path }, info.title));
+    div.appendChild(h3);
+    var when = el(d, 'p', { 'class': 'when' }); fillWhen(d, when, info.dates, info.status); div.appendChild(when);
+    div.appendChild(el(d, 'p', null, info.summary || '[A one- or two-sentence summary of the project.]'));
+    if (info.nums.length) {
+      var dl = el(d, 'dl', { 'class': 'specs' });
+      info.nums.forEach(function (n) { var w = el(d, 'div'); w.appendChild(el(d, 'dt', null, n[0])); w.appendChild(el(d, 'dd', null, n[1])); dl.appendChild(w); });
+      div.appendChild(dl);
+    }
+    div.appendChild(el(d, 'a', { 'class': 'more', href: info.path }, 'Read the full write-up'));
+    art.appendChild(div);
+    return art;
+  }
+
+  function slugify(t) {
+    return t.toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 50) || 'project';
+  }
+  function npMsg(text, isErr) { var m = $('npMsg'); m.textContent = text; m.className = 'msg' + (isErr ? ' err' : ''); }
+
+  $('newProject').addEventListener('click', function () {
+    if (dirty) { setStatus('Save or discard your changes on this page before adding a project.', 'err'); return; }
+    $('newForm').reset(); npMsg('');
+    $('newDlg').showModal(); $('npTitle').focus();
   });
+  $('npCancel').addEventListener('click', function () { if (!busy) $('newDlg').close(); });
+  $('newDlg').addEventListener('cancel', function (e) { if (busy) e.preventDefault(); });
+
+  $('newForm').addEventListener('submit', async function (e) {
+    e.preventDefault();
+    if (busy) return;
+    var title = $('npTitle').value.trim();
+    if (!title) { npMsg('Give the project a name.', true); return; }
+    if (!projects.length) { npMsg('There needs to be at least one existing project to copy the layout from.', true); return; }
+    var vs = document.querySelectorAll('.numV'), ls = document.querySelectorAll('.numL'), nums = [];
+    for (var i = 0; i < vs.length; i++) if (vs[i].value.trim() && ls[i].value.trim()) nums.push([vs[i].value.trim(), ls[i].value.trim()]);
+    var base = slugify(title), path = 'projects/' + base + '.html', n = 2;
+    while (projects.some(function (p) { return p.path === path; })) path = 'projects/' + base + '-' + (n++) + '.html';
+    var first = projects[0], last = projects[projects.length - 1];
+    var np = { path: path, label: title };
+    var info = { title: title, path: path, dates: $('npDates').value.trim() || '[Dates]', status: $('npStatus').value,
+      summary: $('npSummary').value.trim(), nums: nums, homeImg: PLACEHOLDER, pageImg: PLACEHOLDER, prev: last, next: first };
+
+    busy = true; setButtons(); $('npCreate').disabled = true; $('npCancel').disabled = true;
+    try {
+      var file = $('npPhoto').files[0];
+      if (file) {
+        npMsg('Uploading the photo…');
+        var blob;
+        try { blob = await shrink(file); } catch (err) { throw Object.assign(new Error('photo'), { status: -1 }); }
+        var img = 'images/' + base + '-' + Date.now() + '.jpg';
+        var photo64 = toB64(new Uint8Array(await blob.arrayBuffer()));
+        await gh(API + img, { method: 'PUT', body: { message: 'Add photo via site editor', content: photo64, branch: BRANCH } });
+        fresh[new URL(img, SITE).href] = 'data:image/jpeg;base64,' + photo64;
+        info.homeImg = img; info.pageImg = '../' + img;
+      }
+      npMsg('Creating the project page…');
+      var tpl = (await getFile(first.path)).text;
+      await putFile(path, buildPage(tpl, info), null, 'Add project ' + title + ' via site editor');
+      npMsg('Adding it to your home page…');
+      var idx = await getFile(HOME.path), d = parse(idx.text);
+      var rows = d.querySelectorAll('main article.project');
+      rows[rows.length - 1].after(d.createTextNode('\n    '), buildRow(d, info));
+      var homeHtml = toHtml(d);
+      await putFile(HOME.path, homeHtml, idx.sha, 'Add project ' + title + ' to home page via site editor');
+      npMsg('Linking it to your other projects…');
+      if (first.path === last.path) await updatePager(first, np, np);
+      else { await updatePager(last, null, np); await updatePager(first, np, null); }
+      await refreshPages(homeHtml);
+      busy = false; $('newDlg').close();
+      select.value = path;
+      loadPage(np, 'Project created. Click the bracketed text to fill it in, then Save changes.');
+    } catch (err) {
+      busy = false; setButtons();
+      npMsg(err.status === -1 ? 'That photo couldn’t be opened. Save it as a JPG or PNG and try again.' : errText(err), true);
+    }
+    $('npCreate').disabled = false; $('npCancel').disabled = false;
+  });
+
+  $('deleteProject').addEventListener('click', async function () {
+    if (!current || current.path === HOME.path || busy) return;
+    var i = projects.findIndex(function (p) { return p.path === current.path; });
+    if (i < 0) return;
+    var name = projects[i].label;
+    if (!confirm('Delete “' + name + '”? This removes its page and its spot on your home page. You can still recover it later from your GitHub history.')) return;
+    busy = true; setButtons();
+    try {
+      setStatus('Removing it from your home page…');
+      var idx = await getFile(HOME.path), d = parse(idx.text);
+      d.querySelectorAll('main article.project').forEach(function (a) {
+        var l = a.querySelector('h3 a');
+        if (l && l.getAttribute('href') === current.path) {
+          if (a.previousSibling && a.previousSibling.nodeType === 3) a.previousSibling.remove();
+          a.remove();
+        }
+      });
+      var homeHtml = toHtml(d);
+      await putFile(HOME.path, homeHtml, idx.sha, 'Remove project ' + name + ' via site editor');
+      if (projects.length > 1) {
+        setStatus('Updating links between projects…');
+        var prev = projects[(i - 1 + projects.length) % projects.length], next = projects[(i + 1) % projects.length];
+        if (prev.path === next.path) await updatePager(prev, prev, prev);
+        else { await updatePager(prev, null, next); await updatePager(next, prev, null); }
+      }
+      setStatus('Deleting the page…');
+      var f = await getFile(current.path);
+      await gh(API + current.path, { method: 'DELETE', body: { message: 'Delete project ' + name + ' via site editor', sha: f.sha, branch: BRANCH } });
+      await refreshPages(homeHtml);
+      busy = false; dirty = false;
+      select.value = HOME.path;
+      loadPage(HOME, '“' + name + '” was deleted.');
+    } catch (err) {
+      busy = false; setButtons(); setStatus(errText(err), 'err');
+    }
+  });
+
+  /* ---------- Wiring ---------- */
   select.addEventListener('change', function () {
-    var p = PAGES.find(function (x) { return x.path === select.value; });
+    var p = pages.find(function (x) { return x.path === select.value; });
     if (dirty && !confirm('You have unsaved changes on this page. Leave without saving?')) { select.value = current.path; return; }
     loadPage(p);
   });
@@ -329,9 +585,10 @@ iframe{flex:1;width:100%;border:0;background:var(--bg)}
   function showSetup() {
     $('bar').hidden = true; frame.hidden = true; $('setup').hidden = false; $('token').value = ''; $('token').focus();
   }
-  function start() {
+  async function start() {
     $('setup').hidden = true; $('bar').hidden = false;
-    select.value = PAGES[0].path; loadPage(PAGES[0]);
+    try { await refreshPages(); } catch (e) { setStatus(errText(e), 'err'); return; }
+    select.value = HOME.path; loadPage(HOME);
   }
 
   $('connect').addEventListener('click', async function () {
