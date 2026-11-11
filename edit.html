@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Site editor | Max Lasek</title>
+<style>
+:root{--bg:#eef1f4;--surface:#fff;--ink:#132238;--muted:#55657a;--line:#c4ccd6;--blue:#1670bd;--yellow:#f2b90f;--red:#b42318;--green:#1a7f37}
+@media (prefers-color-scheme:dark){:root{color-scheme:dark;--bg:#13203a;--surface:#1b2b49;--ink:#e8edf4;--muted:#a3b1c4;--line:#36496e;--blue:#6bbcf5;--red:#ff8a80;--green:#6fdd8b}}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font:400 15px/1.5 "Helvetica Neue",Arial,sans-serif;display:flex;flex-direction:column}
+.bar{display:flex;align-items:center;gap:.6rem .9rem;flex-wrap:wrap;padding:.6rem 1rem;background:var(--surface);border-bottom:1.5px solid var(--ink)}
+.bar strong{font-size:1.05rem}
+select,button,input{font:inherit;color:inherit}
+select{padding:.4rem .5rem;border:1px solid var(--line);background:var(--bg);border-radius:2px}
+button{padding:.45rem .9rem;border:1.5px solid var(--ink);background:transparent;border-radius:2px;font-weight:600;cursor:pointer}
+button:hover:not(:disabled){background:var(--ink);color:var(--bg)}
+button.primary{background:var(--blue);border-color:var(--blue);color:#fff}
+@media (prefers-color-scheme:dark){button.primary{color:#0d1830}}
+button:disabled{opacity:.45;cursor:default}
+.status{flex:1;min-width:14rem;color:var(--muted)}
+.status.dirty{color:var(--ink);font-weight:600}
+.status.ok{color:var(--green);font-weight:600}
+.status.err{color:var(--red);font-weight:600}
+a{color:var(--blue);font-weight:600}
+iframe{flex:1;width:100%;border:0;background:var(--bg)}
+.setup{width:min(100% - 2rem,40rem);margin:3rem auto;padding:2rem;background:var(--surface);border:1.5px solid var(--ink)}
+.setup h1{margin:0 0 .75rem;font-size:1.75rem;line-height:1.1}
+.setup ol{padding-left:1.25rem}
+.setup li{margin-bottom:.5rem}
+.setup label{display:block;font-weight:600;margin-top:1.25rem}
+.setup input{width:100%;padding:.6rem;border:1px solid var(--line);background:var(--bg);border-radius:2px;margin:.35rem 0 1rem}
+.msg{color:var(--red);min-height:1.5em;margin:.75rem 0 0}
+.hint{color:var(--muted);font-size:.875rem}
+[hidden]{display:none!important}
+:focus-visible{outline:3px solid var(--yellow);outline-offset:2px}
+</style>
+</head>
+<body>
+<section class="setup" id="setup" hidden>
+  <h1>Connect the editor to GitHub</h1>
+  <p>This page saves your edits straight to your site, so it needs a key from your GitHub account. You only do this once per browser.</p>
+  <ol>
+    <li>Open <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">GitHub’s new token page</a>.</li>
+    <li>Name it “Portfolio editor” and pick an expiration date.</li>
+    <li>Under <b>Repository access</b>, choose <b>Only select repositories</b> and pick <b>Max_Lasek_Portfolio</b>.</li>
+    <li>Under <b>Permissions</b>, find <b>Contents</b> and set it to <b>Read and write</b>.</li>
+    <li>Click <b>Generate token</b>, copy it, and paste it below.</li>
+  </ol>
+  <label for="token">GitHub token</label>
+  <input id="token" type="password" autocomplete="off" spellcheck="false" placeholder="github_pat_…">
+  <button id="connect" class="primary">Connect</button>
+  <p class="msg" id="setupMsg" role="alert"></p>
+  <p class="hint">The key is stored only in this browser. Click “Sign out” in the editor to remove it.</p>
+</section>
+
+<div class="bar" id="bar" hidden>
+  <strong>Site editor</strong>
+  <select id="page" aria-label="Page to edit"></select>
+  <span class="status" id="status" role="status"></span>
+  <button id="discard" disabled>Discard changes</button>
+  <button id="save" class="primary" disabled>Save changes</button>
+  <a id="live" href="./" target="_blank" rel="noopener">View live site</a>
+  <button id="signout">Sign out</button>
+</div>
+<iframe id="frame" title="Page being edited" hidden></iframe>
+<input type="file" id="picker" accept="image/jpeg,image/png,image/webp" hidden>
+
+<script>
+(function () {
+  var OWNER = 'maxlasekeng', REPO = 'Max_Lasek_Portfolio', BRANCH = 'main';
+  var REPO_API = 'https://api.github.com/repos/' + OWNER + '/' + REPO;
+  var API = REPO_API + '/contents/';
+  var KEY = 'portfolio-editor-token';
+  var SITE = new URL('./', location.href).href;
+  var PAGES = [
+    { path: 'index.html', label: 'Home page' },
+    { path: 'projects/end-effector.html', label: 'Robotic End Effector' },
+    { path: 'projects/practice-arm.html', label: '3-DOF Practice Arm' },
+    { path: 'projects/rc-av-car.html', label: 'RC / Autonomous Car' }
+  ];
+  var HELP = 'Click any text to edit it. Click a photo to replace it. Press Enter at the end of a paragraph to add a new one.';
+  var EDIT_CSS =
+    '[contenteditable]{cursor:text}' +
+    '[contenteditable]:hover{outline:1.5px dashed rgba(22,112,189,.55);outline-offset:4px}' +
+    '[contenteditable]:focus{outline:2px solid #f2b90f;outline-offset:4px}' +
+    'img[data-ed-img]{cursor:pointer}' +
+    'img[data-ed-img]:hover{outline:3px solid #f2b90f;outline-offset:-3px}';
+
+  var $ = function (id) { return document.getElementById(id); };
+  var frame = $('frame'), picker = $('picker'), select = $('page');
+  var token = null, current = null, sha = null, dirty = false, busy = false, pending = [], imgTarget = null;
+
+  function getToken() { try { return localStorage.getItem(KEY); } catch (e) { return null; } }
+  function setToken(t) { try { if (t) localStorage.setItem(KEY, t); else localStorage.removeItem(KEY); } catch (e) {} }
+
+  function setStatus(text, kind) { var s = $('status'); s.textContent = text; s.className = 'status' + (kind ? ' ' + kind : ''); }
+  function setButtons() {
+    $('save').disabled = !dirty || busy;
+    $('discard').disabled = !dirty || busy;
+    select.disabled = busy;
+  }
+  function markDirty() {
+    if (busy) return;
+    dirty = true; setButtons(); setStatus('Unsaved changes', 'dirty');
+  }
+
+  async function gh(url, opts) {
+    opts = opts || {};
+    var headers = { 'Accept': 'application/vnd.github+json', 'Authorization': 'Bearer ' + token, 'X-GitHub-Api-Version': '2022-11-28' };
+    if (opts.body) headers['Content-Type'] = 'application/json';
+    var r;
+    try {
+      r = await fetch(url, { method: opts.method || 'GET', headers: headers, body: opts.body ? JSON.stringify(opts.body) : undefined, cache: 'no-store' });
+    } catch (e) { var ne = new Error('network'); ne.status = 0; throw ne; }
+    var data = {};
+    try { data = await r.json(); } catch (e) {}
+    if (!r.ok) { var err = new Error(data.message || ('GitHub error ' + r.status)); err.status = r.status; throw err; }
+    return data;
+  }
+
+  function errText(e) {
+    if (e.status === 0) return 'Couldn’t reach GitHub. Check your connection and try again.';
+    if (e.status === 401) return 'GitHub didn’t accept the key. Click Sign out and connect again with a new one.';
+    if (e.status === 403 || e.status === 404) return 'This key can’t save to the site. Make sure it has access to Max_Lasek_Portfolio with Contents set to Read and write.';
+    if (e.status === 409 || e.status === 422) return 'This page was changed on GitHub since you opened it. Copy your edits somewhere, then click Discard changes to reload.';
+    return 'Something went wrong: ' + e.message;
+  }
+
+  function toB64(bytes) {
+    var s = '';
+    for (var i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+    return btoa(s);
+  }
+  function fromB64(b64) {
+    var bin = atob(b64.replace(/\s/g, ''));
+    var bytes = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return new TextDecoder().decode(bytes);
+  }
+  function dirOf(path) { var i = path.lastIndexOf('/'); return i > -1 ? path.slice(0, i + 1) : ''; }
+
+  /* ---------- Loading a page ---------- */
+  async function loadPage(p) {
+    busy = true; setButtons(); setStatus('Loading ' + p.label + '…');
+    try {
+      var data = await gh(API + p.path + '?ref=' + BRANCH);
+      current = p; sha = data.sha; pending = [];
+      var html = fromB64(data.content);
+      html = html.replace(/<head>/i, '<head><base href="' + new URL(dirOf(p.path), SITE).href + '" data-editor>');
+      html = html.replace(/<\/head>/i, '<style data-editor>' + EDIT_CSS + '</style></head>');
+      frame.onload = function () {
+        setup(frame.contentDocument);
+        dirty = false; busy = false; setButtons(); setStatus(HELP);
+        $('live').href = new URL(p.path === 'index.html' ? '' : p.path, SITE).href;
+      };
+      frame.hidden = false;
+      frame.srcdoc = html;
+    } catch (e) {
+      busy = false; setButtons(); setStatus(errText(e), 'err');
+      if (current) select.value = current.path;
+    }
+  }
+
+  function caretToEnd(doc, el) {
+    el.focus();
+    var r = doc.createRange(); r.selectNodeContents(el); r.collapse(false);
+    var s = doc.getSelection(); s.removeAllRanges(); s.addRange(r);
+  }
+
+  function setup(doc) {
+    var sel = 'main h1, main h2, main h3, main p, main dt, main dd, main figcaption, main ul, footer h2, footer small, .actions a, a.more, a.back, .pager a';
+    doc.querySelectorAll(sel).forEach(function (el) {
+      if (el.parentElement && el.parentElement.closest('[contenteditable]')) return;
+      el.setAttribute('contenteditable', 'true');
+      el.setAttribute('spellcheck', 'true');
+    });
+    doc.querySelectorAll('main img').forEach(function (img) {
+      img.setAttribute('data-ed-img', '');
+      img.setAttribute('title', 'Click to replace this photo');
+    });
+
+    doc.addEventListener('click', function (e) {
+      var img = e.target.closest && e.target.closest('img[data-ed-img]');
+      if (img) { e.preventDefault(); imgTarget = img; picker.value = ''; picker.click(); return; }
+      if (e.target.closest && e.target.closest('a')) e.preventDefault();
+    }, true);
+
+    doc.addEventListener('input', markDirty);
+
+    doc.addEventListener('keydown', function (e) {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { e.preventDefault(); save(); return; }
+      var ed = e.target.closest && e.target.closest('[contenteditable]');
+      if (!ed) return;
+      if (e.key === 'Enter') {
+        if (ed.tagName === 'UL') return; /* Enter adds a new bullet */
+        e.preventDefault();
+        if (ed.tagName === 'P' && ed.closest('main') && !ed.classList.contains('when')) {
+          var np = doc.createElement('p');
+          np.setAttribute('contenteditable', 'true');
+          np.setAttribute('spellcheck', 'true');
+          ed.after(np);
+          np.focus();
+          markDirty();
+        }
+      } else if (e.key === 'Backspace' && ed.tagName === 'P' && !ed.textContent.trim()) {
+        var prev = ed.previousElementSibling;
+        if (prev && prev.getAttribute('contenteditable')) {
+          e.preventDefault(); ed.remove(); caretToEnd(doc, prev); markDirty();
+        }
+      }
+    });
+
+    doc.addEventListener('paste', function (e) {
+      if (!(e.target.closest && e.target.closest('[contenteditable]'))) return;
+      e.preventDefault();
+      var text = (e.clipboardData.getData('text/plain') || '').replace(/\s*\n\s*/g, ' ');
+      doc.execCommand('insertText', false, text);
+    });
+  }
+
+  /* ---------- Replacing photos ---------- */
+  async function shrink(file) {
+    var bmp = await createImageBitmap(file);
+    var scale = Math.min(1, 1800 / Math.max(bmp.width, bmp.height));
+    var c = document.createElement('canvas');
+    c.width = Math.round(bmp.width * scale); c.height = Math.round(bmp.height * scale);
+    var ctx = c.getContext('2d');
+    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height);
+    ctx.drawImage(bmp, 0, 0, c.width, c.height);
+    return await new Promise(function (res) { c.toBlob(res, 'image/jpeg', 0.86); });
+  }
+
+  picker.addEventListener('change', async function () {
+    var f = picker.files[0], img = imgTarget;
+    if (!f || !img) return;
+    try {
+      setStatus('Preparing photo…');
+      var blob = await shrink(f);
+      var b64 = toB64(new Uint8Array(await blob.arrayBuffer()));
+      var name = 'images/photo-' + Date.now() + '.jpg';
+      var rel = (dirOf(current.path) ? '../' : '') + name;
+      if (img.getAttribute('alt')) {
+        var alt = prompt('Describe the new photo in a sentence. Screen readers and search engines use this.', img.getAttribute('alt'));
+        if (alt !== null && alt.trim()) img.setAttribute('alt', alt.trim());
+      }
+      img.removeAttribute('width'); img.removeAttribute('height');
+      img.setAttribute('data-new-src', rel);
+      img.src = 'data:image/jpeg;base64,' + b64;
+      pending = pending.filter(function (p) { return p.img !== img; });
+      pending.push({ img: img, path: name, b64: b64, done: false });
+      markDirty();
+    } catch (e) {
+      setStatus('That photo couldn’t be opened. Save it as a JPG or PNG and try again.', 'err');
+    }
+  });
+
+  /* ---------- Saving ---------- */
+  function serialize(doc) {
+    var root = doc.documentElement.cloneNode(true);
+    root.querySelectorAll('[data-editor]').forEach(function (el) { el.remove(); });
+    root.querySelectorAll('[contenteditable]').forEach(function (el) { el.removeAttribute('contenteditable'); el.removeAttribute('spellcheck'); });
+    root.querySelectorAll('img[data-ed-img]').forEach(function (img) {
+      img.removeAttribute('data-ed-img'); img.removeAttribute('title');
+      var n = img.getAttribute('data-new-src');
+      if (n) { img.setAttribute('src', n); img.removeAttribute('data-new-src'); }
+    });
+    root.querySelectorAll('main font, main span[style], footer span[style]').forEach(function (el) { el.replaceWith.apply(el, Array.from(el.childNodes)); });
+    root.querySelectorAll('main [style], footer [style]').forEach(function (el) { el.removeAttribute('style'); });
+    root.querySelectorAll('main br, footer br').forEach(function (br) { if (!br.nextSibling) br.remove(); });
+    ['main', 'footer'].forEach(function (tag) {
+      var area = root.querySelector(tag); if (!area) return;
+      var w = doc.createTreeWalker(area, NodeFilter.SHOW_TEXT), n;
+      while ((n = w.nextNode())) { if (n.nodeValue.indexOf('\u00a0') > -1) n.nodeValue = n.nodeValue.replace(/\u00a0/g, ' ').replace(/ {2,}/g, ' '); }
+    });
+    root.querySelectorAll('main p, main li').forEach(function (el) { if (!el.textContent.trim() && !el.querySelector('img')) el.remove(); });
+    return '<!DOCTYPE html>\n' + root.outerHTML + '\n';
+  }
+
+  async function save() {
+    if (!dirty || busy || !current) return;
+    busy = true; setButtons();
+    try {
+      var todo = pending.filter(function (p) { return !p.done; });
+      for (var i = 0; i < todo.length; i++) {
+        setStatus('Uploading photo ' + (i + 1) + ' of ' + todo.length + '…');
+        await gh(API + todo[i].path, { method: 'PUT', body: { message: 'Add photo via site editor', content: todo[i].b64, branch: BRANCH } });
+        todo[i].done = true;
+      }
+      setStatus('Saving ' + current.label + '…');
+      var html = serialize(frame.contentDocument);
+      var res = await gh(API + current.path, { method: 'PUT', body: {
+        message: 'Edit ' + current.label + ' via site editor',
+        content: toB64(new TextEncoder().encode(html)),
+        sha: sha, branch: BRANCH
+      } });
+      sha = res.content.sha; pending = []; dirty = false;
+      setStatus('Saved. The live site updates in about a minute.', 'ok');
+    } catch (e) {
+      setStatus(errText(e), 'err');
+    }
+    busy = false; setButtons();
+  }
+
+  /* ---------- Wiring ---------- */
+  PAGES.forEach(function (p) {
+    var o = document.createElement('option'); o.value = p.path; o.textContent = p.label; select.appendChild(o);
+  });
+  select.addEventListener('change', function () {
+    var p = PAGES.find(function (x) { return x.path === select.value; });
+    if (dirty && !confirm('You have unsaved changes on this page. Leave without saving?')) { select.value = current.path; return; }
+    loadPage(p);
+  });
+  $('save').addEventListener('click', save);
+  $('discard').addEventListener('click', function () {
+    if (confirm('Throw away your unsaved changes on this page?')) loadPage(current);
+  });
+  $('signout').addEventListener('click', function () {
+    if (dirty && !confirm('You have unsaved changes. Sign out anyway?')) return;
+    setToken(null); token = null; dirty = false; showSetup();
+  });
+  document.addEventListener('keydown', function (e) {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { e.preventDefault(); save(); }
+  });
+  window.addEventListener('beforeunload', function (e) { if (dirty) { e.preventDefault(); e.returnValue = ''; } });
+
+  function showSetup() {
+    $('bar').hidden = true; frame.hidden = true; $('setup').hidden = false; $('token').value = ''; $('token').focus();
+  }
+  function start() {
+    $('setup').hidden = true; $('bar').hidden = false;
+    select.value = PAGES[0].path; loadPage(PAGES[0]);
+  }
+
+  $('connect').addEventListener('click', async function () {
+    var t = $('token').value.trim();
+    if (!t) { $('setupMsg').textContent = 'Paste your token first.'; return; }
+    token = t; $('setupMsg').textContent = ''; $('connect').disabled = true;
+    try {
+      await gh(REPO_API);
+      setToken(t); start();
+    } catch (e) {
+      token = null;
+      $('setupMsg').textContent = e.status === 401 ? 'GitHub didn’t accept that token. Check that you copied all of it.'
+        : e.status === 404 ? 'That token can’t see Max_Lasek_Portfolio. Make sure you picked it under Repository access.'
+        : errText(e);
+    }
+    $('connect').disabled = false;
+  });
+  $('token').addEventListener('keydown', function (e) { if (e.key === 'Enter') $('connect').click(); });
+
+  token = getToken();
+  if (token) start(); else showSetup();
+})();
+</script>
+</body>
+</html>
