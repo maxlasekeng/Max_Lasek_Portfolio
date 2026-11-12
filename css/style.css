@@ -232,12 +232,28 @@ body { background: transparent; }
 body::before {
   content: "";
   position: fixed;
-  inset: 0;
+  top: 0;
+  left: 0;
+  width: 100%;
+  /* the sky image is tall (1000 x 2576), so the layer is as tall as the image at full width */
+  height: max(100vh, 257.6vw);
   z-index: -1;
   background:
-    linear-gradient(rgba(5, 10, 24, 0.28), rgba(5, 10, 24, 0.5)),
+    linear-gradient(rgba(5, 10, 24, 0.38), rgba(5, 10, 24, 0.38)),
     url("../images/sky.jpg") center top / cover no-repeat,
     #0b1426;
+  will-change: transform;
+}
+/* As the page scrolls from top to bottom, the sky slides up from its top edge to its bottom edge */
+@supports (animation-timeline: scroll()) {
+  body::before {
+    animation: sky-pan linear both;
+    animation-timeline: scroll(root block);
+  }
+}
+@keyframes sky-pan {
+  from { transform: translateY(0); }
+  to { transform: translateY(calc(100vh - 100%)); }
 }
 .site-header {
   background: rgba(8, 14, 30, 0.72);
