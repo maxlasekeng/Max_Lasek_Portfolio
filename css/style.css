@@ -214,3 +214,55 @@ ul { margin: 0; padding: 0; list-style: none; }
   .title-block div + div { border-top: 1px solid var(--ink); }
   .specs { grid-template-columns: 1fr 1fr; }
 }
+
+/* ---------- Night sky theme ----------
+   The sky stays fixed behind the page while you scroll, and the desert
+   rises up at the very bottom, fading in from the night. */
+:root {
+  color-scheme: dark;
+  --bg: #0b1426;
+  --surface: rgba(14, 25, 48, 0.78);
+  --ink: #e8edf4;
+  --muted: #aab8cb;
+  --line: rgba(170, 190, 220, 0.28);
+  --blue: #7cc4f7;
+}
+html { background: #0b1426; }
+body { background: transparent; }
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background:
+    linear-gradient(rgba(5, 10, 24, 0.3), rgba(5, 10, 24, 0.55)),
+    url("../images/sky.jpg") center / cover no-repeat,
+    #0b1426;
+}
+.site-header {
+  background: rgba(8, 14, 30, 0.72);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  border-bottom-color: var(--line);
+}
+.sheet, .side {
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+.button.solid { color: #0b1426; }
+.contact {
+  background: transparent;
+  color: var(--ink);
+  padding-bottom: 0;
+}
+.contact small { margin-bottom: 1rem; }
+.contact::after {
+  content: "";
+  display: block;
+  height: clamp(16rem, 52vw, 46rem);
+  background:
+    linear-gradient(to bottom, rgba(11, 20, 38, 0.95) 0%, rgba(11, 20, 38, 0.35) 40%, rgba(11, 20, 38, 0) 65%),
+    url("../images/desert.jpg") center bottom / cover no-repeat;
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 45%);
+  mask-image: linear-gradient(to bottom, transparent 0%, #000 45%);
+}
