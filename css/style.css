@@ -287,9 +287,9 @@ body::after {
 .button.solid { color: #0b1426; }
 .contact {
   /* a band of the desert photo's own sky color, fading in from the night above */
-  background: linear-gradient(to bottom, rgba(0, 0, 164, 0) 0, rgba(0, 0, 164, 0.55) 10rem, #0000a4 22rem);
+  background: linear-gradient(to bottom, rgba(0, 0, 164, 0) 0, rgba(0, 0, 164, 0.12) 10rem, rgba(0, 0, 164, 0.35) 20rem, rgba(0, 0, 164, 0.7) 30rem, #0000a4 40rem);
   color: var(--ink);
-  padding-top: clamp(9rem, 16vw, 13rem);
+  padding-top: clamp(18rem, 30vw, 28rem);
   padding-bottom: 0;
 }
 .contact small { margin-bottom: 1rem; }
@@ -300,6 +300,6 @@ body::after {
   aspect-ratio: 3 / 2;
   max-height: 100vh;
   background: url("../images/desert.jpg") center bottom / cover no-repeat;
-  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 40%);
-  mask-image: linear-gradient(to bottom, transparent 0%, #000 40%);
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 55%);
+  mask-image: linear-gradient(to bottom, transparent 0%, #000 55%);
 }
