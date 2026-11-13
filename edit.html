@@ -46,6 +46,22 @@ dialog .nums{display:grid;grid-template-columns:repeat(3,1fr);gap:.6rem}
 dialog .nums div{display:grid;gap:.35rem}
 dialog .buttons{display:flex;justify-content:flex-end;gap:.6rem;margin-top:.5rem}
 @media (max-width:32rem){dialog .row,dialog .nums{grid-template-columns:1fr}}
+dialog.crop{width:min(100% - 2rem,64rem)}
+.stage-wrap{text-align:center;margin-top:.75rem}
+.stage{position:relative;display:inline-block;max-width:100%;overflow:hidden;line-height:0;touch-action:none;user-select:none;-webkit-user-select:none}
+.stage img{display:block;max-width:100%;max-height:60vh}
+.cbox{position:absolute;border:2px solid #fff;box-shadow:0 0 0 9999px rgba(0,0,0,.58);cursor:move;touch-action:none}
+.cbox::before,.cbox::after{content:"";position:absolute;inset:33.33% 0;border-top:1px solid rgba(255,255,255,.45);border-bottom:1px solid rgba(255,255,255,.45);pointer-events:none}
+.cbox::after{inset:0 33.33%;border:0;border-left:1px solid rgba(255,255,255,.45);border-right:1px solid rgba(255,255,255,.45)}
+.cbox .h{position:absolute;width:18px;height:18px;background:#fff;border:2px solid #1670bd;border-radius:2px}
+.cbox .h[data-h=nw]{left:-10px;top:-10px;cursor:nwse-resize}
+.cbox .h[data-h=ne]{right:-10px;top:-10px;cursor:nesw-resize}
+.cbox .h[data-h=sw]{left:-10px;bottom:-10px;cursor:nesw-resize}
+.cbox .h[data-h=se]{right:-10px;bottom:-10px;cursor:nwse-resize}
+.crop-row{display:flex;align-items:center;gap:.75rem;flex-wrap:wrap}
+.crop-row label{margin:0}
+.crop-row select{width:auto}
+dialog .buttons.left{justify-content:flex-start;flex-wrap:wrap}
 .hint{color:var(--muted);font-size:.875rem}
 [hidden]{display:none!important}
 :focus-visible{outline:3px solid var(--yellow);outline-offset:2px}
@@ -114,6 +130,45 @@ dialog .buttons{display:flex;justify-content:flex-end;gap:.6rem;margin-top:.5rem
   </form>
 </dialog>
 
+<dialog id="photoDlg" aria-labelledby="photoTitle">
+  <h2 id="photoTitle">Change this photo</h2>
+  <p class="hint">Replace it with a file from your computer, or crop the one that’s there.</p>
+  <div class="buttons left">
+    <button type="button" class="primary" id="phReplace">Replace with a new photo</button>
+    <button type="button" id="phCrop">Crop this photo</button>
+    <button type="button" id="phCancel">Cancel</button>
+  </div>
+</dialog>
+
+<dialog id="cropDlg" class="crop" aria-labelledby="cropTitle">
+  <h2 id="cropTitle">Crop photo</h2>
+  <div class="crop-row">
+    <label for="cropRatio">Shape</label>
+    <select id="cropRatio">
+      <option value="spot">Fit where it’s shown</option>
+      <option value="free">Free</option>
+      <option value="orig">Original shape</option>
+      <option value="4:3">4:3</option>
+      <option value="3:2">3:2</option>
+      <option value="16:9">16:9</option>
+      <option value="1:1">Square</option>
+      <option value="3:4">3:4 (tall)</option>
+    </select>
+    <span class="hint">Drag the box to move it. Drag a corner to resize it.</span>
+  </div>
+  <div class="stage-wrap">
+    <div class="stage" id="stage">
+      <img id="cropImg" alt="">
+      <div class="cbox" id="cbox"><span class="h" data-h="nw"></span><span class="h" data-h="ne"></span><span class="h" data-h="sw"></span><span class="h" data-h="se"></span></div>
+    </div>
+  </div>
+  <p class="msg err" id="cropMsg" role="alert"></p>
+  <div class="buttons">
+    <button type="button" id="cropCancel">Cancel</button>
+    <button type="button" class="primary" id="cropApply">Apply crop</button>
+  </div>
+</dialog>
+
 <script>
 (function () {
   var OWNER = 'maxlasekeng', REPO = 'Max_Lasek_Portfolio', BRANCH = 'main';
@@ -131,7 +186,7 @@ dialog .buttons{display:flex;justify-content:flex-end;gap:.6rem;margin-top:.5rem
     ['Key decisions', '[What choices did you make, and why?]'],
     ['Next steps', '[What would you improve or try next?]']
   ];
-  var HELP = 'Click any text to edit it. Click a photo to replace it. Press Enter at the end of a paragraph to add a new one.';
+  var HELP = 'Click any text to edit it. Click a photo to replace or crop it. Press Enter at the end of a paragraph to add a new one.';
   var EDIT_CSS =
     '[contenteditable]{cursor:text}' +
     '[contenteditable]:hover{outline:1.5px dashed rgba(22,112,189,.55);outline-offset:4px}' +
@@ -240,7 +295,7 @@ dialog .buttons{display:flex;justify-content:flex-end;gap:.6rem;margin-top:.5rem
 
     doc.addEventListener('click', function (e) {
       var img = e.target.closest && e.target.closest('img[data-ed-img]');
-      if (img) { e.preventDefault(); imgTarget = img; picker.value = ''; picker.click(); return; }
+      if (img) { e.preventDefault(); openPhotoMenu(img); return; }
       if (e.target.closest && e.target.closest('a')) e.preventDefault();
     }, true);
 
@@ -311,6 +366,116 @@ dialog .buttons{display:flex;justify-content:flex-end;gap:.6rem;margin-top:.5rem
     } catch (e) {
       setStatus('That photo couldn’t be opened. Save it as a JPG or PNG and try again.', 'err');
     }
+  });
+
+  /* ---------- Photo menu and cropping ---------- */
+  var photoImg = null, crop = null, ratio = null, natW = 0, natH = 0, drag = null, MIN = 30;
+  var cropImg = $('cropImg'), cbox = $('cbox');
+
+  function openPhotoMenu(img) {
+    photoImg = img;
+    $('phCrop').disabled = /^data:image\/svg/.test(img.src);
+    $('photoDlg').showModal();
+  }
+  $('phReplace').addEventListener('click', function () { $('photoDlg').close(); imgTarget = photoImg; picker.value = ''; picker.click(); });
+  $('phCancel').addEventListener('click', function () { $('photoDlg').close(); });
+  $('phCrop').addEventListener('click', function () { $('photoDlg').close(); openCrop(photoImg); });
+
+  function ratioValue() {
+    var v = $('cropRatio').value;
+    if (v === 'free') return null;
+    if (v === 'spot') return photoImg.clientWidth && photoImg.clientHeight ? photoImg.clientWidth / photoImg.clientHeight : natW / natH;
+    if (v === 'orig') return natW / natH;
+    var p = v.split(':'); return +p[0] / +p[1];
+  }
+  function drawBox() {
+    cbox.style.left = crop.x + 'px'; cbox.style.top = crop.y + 'px';
+    cbox.style.width = crop.w + 'px'; cbox.style.height = crop.h + 'px';
+  }
+  function resetBox() {
+    ratio = ratioValue();
+    var W = cropImg.clientWidth, H = cropImg.clientHeight, w = W, h = H;
+    if (ratio) { h = w / ratio; if (h > H) { h = H; w = h * ratio; } }
+    crop = { x: (W - w) / 2, y: (H - h) / 2, w: w, h: h };
+    drawBox();
+  }
+  function openCrop(img) {
+    photoImg = img; crop = null;
+    $('cropMsg').textContent = '';
+    $('cropRatio').value = 'spot';
+    cropImg.onload = function () {
+      natW = cropImg.naturalWidth; natH = cropImg.naturalHeight;
+      requestAnimationFrame(resetBox);
+    };
+    $('cropDlg').showModal();
+    cropImg.src = img.currentSrc || img.src;
+  }
+  $('cropRatio').addEventListener('change', resetBox);
+  window.addEventListener('resize', function () { if ($('cropDlg').open && crop) resetBox(); });
+
+  cbox.addEventListener('pointerdown', function (e) {
+    e.preventDefault();
+    drag = { mode: e.target.getAttribute('data-h') || 'move', px: e.clientX, py: e.clientY, s: { x: crop.x, y: crop.y, w: crop.w, h: crop.h } };
+    cbox.setPointerCapture(e.pointerId);
+  });
+  cbox.addEventListener('pointermove', function (e) {
+    if (!drag) return;
+    var dx = e.clientX - drag.px, dy = e.clientY - drag.py, s = drag.s, W = cropImg.clientWidth, H = cropImg.clientHeight;
+    if (drag.mode === 'move') {
+      crop.x = Math.min(Math.max(0, s.x + dx), W - s.w);
+      crop.y = Math.min(Math.max(0, s.y + dy), H - s.h);
+    } else {
+      var hx = drag.mode.indexOf('e') > -1 ? 1 : -1, vy = drag.mode.indexOf('s') > -1 ? 1 : -1;
+      var ax = hx > 0 ? s.x : s.x + s.w, ay = vy > 0 ? s.y : s.y + s.h;
+      var maxW = hx > 0 ? W - ax : ax, maxH = vy > 0 ? H - ay : ay;
+      var w = s.w + hx * dx, h = s.h + vy * dy;
+      if (ratio) {
+        var wy = h * ratio;
+        if (Math.abs(wy - s.w) > Math.abs(w - s.w)) w = wy;
+        w = Math.max(MIN, Math.min(w, maxW, maxH * ratio));
+        h = w / ratio;
+      } else {
+        w = Math.max(MIN, Math.min(w, maxW));
+        h = Math.max(MIN, Math.min(h, maxH));
+      }
+      crop.w = w; crop.h = h;
+      crop.x = hx > 0 ? ax : ax - w;
+      crop.y = vy > 0 ? ay : ay - h;
+    }
+    drawBox();
+  });
+  cbox.addEventListener('pointerup', function () { drag = null; });
+  cbox.addEventListener('pointercancel', function () { drag = null; });
+
+  $('cropCancel').addEventListener('click', function () { $('cropDlg').close(); });
+  $('cropApply').addEventListener('click', async function () {
+    if (!crop || !natW) return;
+    var img = photoImg, k = natW / cropImg.clientWidth;
+    var sx = Math.round(crop.x * k), sy = Math.round(crop.y * k), sw = Math.round(crop.w * k), sh = Math.round(crop.h * k);
+    var out = Math.min(1, 2000 / Math.max(sw, sh));
+    var c = document.createElement('canvas');
+    c.width = Math.max(1, Math.round(sw * out)); c.height = Math.max(1, Math.round(sh * out));
+    var ctx = c.getContext('2d');
+    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height);
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(cropImg, sx, sy, sw, sh, 0, 0, c.width, c.height);
+    var blob;
+    try {
+      blob = await new Promise(function (res, rej) { c.toBlob(function (b) { if (b) res(b); else rej(new Error('blob')); }, 'image/jpeg', 0.88); });
+    } catch (err) {
+      $('cropMsg').textContent = 'This photo can’t be cropped here. Use “Replace with a new photo” instead.';
+      return;
+    }
+    var b64 = toB64(new Uint8Array(await blob.arrayBuffer()));
+    var name = 'images/photo-' + Date.now() + '.jpg';
+    img.removeAttribute('width'); img.removeAttribute('height');
+    img.setAttribute('data-new-src', (dirOf(current.path) ? '../' : '') + name);
+    img.src = 'data:image/jpeg;base64,' + b64;
+    pending = pending.filter(function (p) { return p.img !== img; });
+    pending.push({ img: img, path: name, b64: b64, done: false });
+    $('cropDlg').close();
+    markDirty();
+    setStatus('Photo cropped. Click Save changes to publish it.', 'dirty');
   });
 
   /* ---------- Saving ---------- */
