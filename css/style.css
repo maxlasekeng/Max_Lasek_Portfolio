@@ -294,6 +294,7 @@ body::after {
   padding-bottom: 0;
 }
 .contact small { margin-bottom: 1rem; }
+.contact .wrap { position: relative; z-index: 1; }
 /* A band of the desert photo's own sky color, matched to its top edge from left to right,
    fading in from the night above so the photo itself needs no fade */
 .contact::before {
@@ -310,5 +311,10 @@ body::after {
   display: block;
   width: 100%;
   aspect-ratio: 850 / 567;
+  /* pulled up so "Get in touch" sits in the photo's sky */
+  margin-top: -16vw;
   background: url("../images/desert.jpg") center top / 100% 100% no-repeat;
+  /* the photo's top edge melts into the blue band above it */
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, rgba(0, 0, 0, 0.25) 12%, rgba(0, 0, 0, 0.65) 24%, #000 36%);
+  mask-image: linear-gradient(to bottom, transparent 0, rgba(0, 0, 0, 0.25) 12%, rgba(0, 0, 0, 0.65) 24%, #000 36%);
 }
