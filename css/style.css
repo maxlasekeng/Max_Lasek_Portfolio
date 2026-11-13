@@ -318,3 +318,5 @@ body::after {
   -webkit-mask-image: linear-gradient(to bottom, transparent 0, rgba(0, 0, 0, 0.25) 12%, rgba(0, 0, 0, 0.65) 24%, #000 36%);
   mask-image: linear-gradient(to bottom, transparent 0, rgba(0, 0, 0, 0.25) 12%, rgba(0, 0, 0, 0.65) 24%, #000 36%);
 }
+/* The Contact link lands with "Get in touch" near the top and the desert in view below */
+.contact { scroll-margin-top: calc(1.5rem - clamp(18rem, 30vw, 28rem)); }
