@@ -104,7 +104,7 @@ dialog .buttons.left{justify-content:flex-start;flex-wrap:wrap}
 <dialog id="newDlg" aria-labelledby="newTitle">
   <form id="newForm">
     <h2 id="newTitle">New project</h2>
-    <p class="hint">This makes a page for the project, adds it to the bottom of your home page, and links it to your other projects. You can change all of it afterward.</p>
+    <p class="hint">This makes a page for the project and adds it to your All projects page in order of its start date. To show it on your home page too, use Swap project on one of your featured spots.</p>
     <label for="npTitle">Project name</label>
     <input id="npTitle" maxlength="80" placeholder="e.g. Differential Wrist" required>
     <div class="row">
@@ -130,6 +130,18 @@ dialog .buttons.left{justify-content:flex-start;flex-wrap:wrap}
       <button type="submit" class="primary" id="npCreate">Create project</button>
     </div>
   </form>
+</dialog>
+
+<dialog id="swapDlg" aria-labelledby="swapTitle">
+  <h2 id="swapTitle">Swap featured project</h2>
+  <p class="hint" id="swapHint">Pick the project to show in this spot on your home page.</p>
+  <label for="swapSel">Project</label>
+  <select id="swapSel"></select>
+  <p class="msg" id="swapMsg" role="status"></p>
+  <div class="buttons">
+    <button type="button" id="swapCancel">Cancel</button>
+    <button type="button" class="primary" id="swapOk">Swap</button>
+  </div>
 </dialog>
 
 <dialog id="photoDlg" aria-labelledby="photoTitle">
@@ -195,7 +207,10 @@ dialog .buttons.left{justify-content:flex-start;flex-wrap:wrap}
     '[contenteditable]:hover{outline:1.5px dashed rgba(22,112,189,.55);outline-offset:4px}' +
     '[contenteditable]:focus{outline:2px solid #f2b90f;outline-offset:4px}' +
     'img[data-ed-img]{cursor:pointer}' +
-    'img[data-ed-img]:hover{outline:3px solid #f2b90f;outline-offset:-3px}';
+    'img[data-ed-img]:hover{outline:3px solid #f2b90f;outline-offset:-3px}' +
+    'main article.project{position:relative}' +
+    '[data-ed-swap]{position:absolute;top:.75rem;right:.75rem;z-index:5;font:600 15px/1 Arial,sans-serif;padding:.6rem .9rem;border:2px solid #f2b90f;border-radius:3px;background:#132238;color:#fff;cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,.35)}' +
+    '[data-ed-swap]:hover{background:#f2b90f;color:#132238}';
 
   var $ = function (id) { return document.getElementById(id); };
   var frame = $('frame'), picker = $('picker'), select = $('page');
@@ -211,6 +226,7 @@ dialog .buttons.left{justify-content:flex-start;flex-wrap:wrap}
     $('discard').disabled = !dirty || busy;
     select.disabled = busy;
     $('newProject').disabled = busy;
+    $('swapOk').disabled = busy;
     $('resumeBtn').disabled = busy;
     $('deleteProject').disabled = busy;
   }
@@ -291,6 +307,9 @@ dialog .buttons.left{justify-content:flex-start;flex-wrap:wrap}
       el.setAttribute('contenteditable', 'true');
       el.setAttribute('spellcheck', 'true');
     });
+    if (current && current.path === HOME.path && hasAll) {
+      doc.querySelectorAll('#projects article.project').forEach(function (a) { addSwapButton(doc, a); });
+    }
     doc.querySelectorAll('main img').forEach(function (img) {
       if (fresh[img.src]) { img.setAttribute('data-new-src', img.getAttribute('src')); img.src = fresh[img.src]; }
       img.setAttribute('data-ed-img', '');
@@ -298,6 +317,8 @@ dialog .buttons.left{justify-content:flex-start;flex-wrap:wrap}
     });
 
     doc.addEventListener('click', function (e) {
+      var sw = e.target.closest && e.target.closest('[data-ed-swap]');
+      if (sw) { e.preventDefault(); openSwap(sw.closest('article.project')); return; }
       var img = e.target.closest && e.target.closest('img[data-ed-img]');
       if (img) { e.preventDefault(); openPhotoMenu(img); return; }
       if (e.target.closest && e.target.closest('a')) e.preventDefault();
@@ -334,6 +355,109 @@ dialog .buttons.left{justify-content:flex-start;flex-wrap:wrap}
       var text = (e.clipboardData.getData('text/plain') || '').replace(/\s*\n\s*/g, ' ');
       doc.execCommand('insertText', false, text);
     });
+  }
+
+  /* ---------- Featured projects: swap a slot ---------- */
+  var swapSlot = null, allText = '';
+  function addSwapButton(doc, art) {
+    var b = doc.createElement('button');
+    b.type = 'button';
+    b.setAttribute('data-editor', '');
+    b.setAttribute('data-ed-swap', '');
+    b.setAttribute('contenteditable', 'false');
+    b.textContent = 'Swap project';
+    art.appendChild(b);
+  }
+  function slotPath(art) { var a = art.querySelector('h3 a'); return a ? a.getAttribute('href') : ''; }
+  function openSwap(art) {
+    if (!art || busy) return;
+    swapSlot = art;
+    var doc = art.ownerDocument;
+    var shown = Array.from(doc.querySelectorAll('#projects article.project')).map(slotPath);
+    var choices = projects.filter(function (p) { return shown.indexOf(p.path) < 0; });
+    var sel = $('swapSel'); sel.textContent = '';
+    choices.forEach(function (p) { sel.appendChild(el(document, 'option', { value: p.path }, p.label)); });
+    var name = (art.querySelector('h3') || {}).textContent || 'this project';
+    $('swapHint').textContent = 'Pick the project to show instead of “' + name.trim() + '” on your home page.';
+    $('swapMsg').textContent = choices.length ? '' : 'All your projects are already featured. Add a new project first.';
+    sel.disabled = !choices.length; $('swapOk').disabled = !choices.length;
+    $('swapDlg').showModal();
+  }
+  $('swapCancel').addEventListener('click', function () { $('swapDlg').close(); });
+  $('swapOk').addEventListener('click', function () {
+    var path = $('swapSel').value, art = swapSlot;
+    if (!path || !art) return;
+    var card = Array.from(parse(allText).querySelectorAll('main article.pcard')).find(function (c) { return slotPath(c) === path; });
+    if (!card) { $('swapMsg').textContent = 'That project isn’t on your All projects page, so it can’t be featured.'; return; }
+    var doc = art.ownerDocument;
+    var row = doc.createElement('article'); row.className = 'project';
+    var media = doc.createElement('a');
+    media.className = 'project-media'; media.setAttribute('href', path); media.setAttribute('tabindex', '-1'); media.setAttribute('aria-hidden', 'true');
+    var srcImg = card.querySelector('img');
+    if (srcImg) {
+      var img = doc.createElement('img');
+      img.setAttribute('src', srcImg.getAttribute('src')); img.setAttribute('alt', ''); img.setAttribute('loading', 'lazy');
+      img.setAttribute('data-ed-img', ''); img.setAttribute('title', 'Click to replace this photo');
+      media.appendChild(img);
+    }
+    row.appendChild(media);
+    var body = doc.createElement('div');
+    var bodySrc = card.querySelector('.pcard-body') || card;
+    Array.from(bodySrc.children).forEach(function (c) { body.appendChild(doc.importNode(c, true)); });
+    body.querySelectorAll('h3, p, dt, dd, ul, a.more').forEach(function (e) {
+      if (e.parentElement && e.parentElement.closest('[contenteditable]')) return;
+      e.setAttribute('contenteditable', 'true'); e.setAttribute('spellcheck', 'true');
+    });
+    row.appendChild(body);
+    addSwapButton(doc, row);
+    art.replaceWith(row);
+    $('swapDlg').close();
+    markDirty();
+    setStatus('Swapped in “' + (card.querySelector('h3') || {}).textContent.trim() + '”. Click Save changes to publish it.', 'dirty');
+  });
+
+  /* ---------- All projects page: keep it sorted by start date ---------- */
+  var MONTHS = { jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12, winter: 1, spring: 3, summer: 6, fall: 9, autumn: 9 };
+  function startKey(text) {
+    var t = (text || '').toLowerCase();
+    var y = t.match(/\d{4}/);
+    if (!y) return Infinity;
+    var m = t.match(/\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|winter|spring|summer|fall|autumn)/);
+    return +y[0] * 12 + (m && m.index < y.index ? MONTHS[m[1]] : 1);
+  }
+  function cardOrder(doc) {
+    return Array.from(doc.querySelectorAll('main article.pcard h3 a')).map(function (a) {
+      return { path: a.getAttribute('href'), label: a.textContent.trim() };
+    });
+  }
+  function sortGrid(doc) {
+    var grid = doc.querySelector('.pcard-grid');
+    if (!grid) return false;
+    var cards = Array.from(grid.children).filter(function (c) { return c.matches('article.pcard'); });
+    var keyed = cards.map(function (c, i) { var w = c.querySelector('.when'); return { c: c, k: startKey(w ? w.textContent : ''), i: i }; });
+    keyed.sort(function (a, b) { return a.k - b.k || a.i - b.i; });
+    if (keyed.every(function (o, i) { return o.c === cards[i]; })) return false;
+    grid.textContent = '';
+    keyed.forEach(function (o) { grid.append(doc.createTextNode('\n        '), o.c); });
+    grid.append(doc.createTextNode('\n      '));
+    return true;
+  }
+  /* Make every project's Previous / Next links follow the given order */
+  async function relinkAll(order) {
+    for (var i = 0; i < order.length; i++) {
+      var p = order[i], prev = order[(i - 1 + order.length) % order.length], next = order[(i + 1) % order.length];
+      var f; try { f = await getFile(p.path); } catch (e) { if (e.status === 404) continue; throw e; }
+      var d = parse(f.text), links = d.querySelectorAll('nav.pager a');
+      if (links.length < 2) continue;
+      var ph = prev.path.replace(/^projects\//, ''), nh = next.path.replace(/^projects\//, '');
+      if (links[0].getAttribute('href') === ph && links[0].textContent === 'Previous: ' + prev.label &&
+          links[1].getAttribute('href') === nh && links[1].textContent === 'Next: ' + next.label) continue;
+      setPager(d, 'prev', prev); setPager(d, 'next', next);
+      await putFile(p.path, toHtml(d), f.sha, 'Update project links via site editor');
+    }
+  }
+  function sameOrder(a, b) {
+    return a.length === b.length && a.every(function (p, i) { return p.path === b[i].path && p.label === b[i].label; });
   }
 
   /* ---------- Replacing photos ---------- */
@@ -549,6 +673,7 @@ dialog .buttons.left{justify-content:flex-start;flex-wrap:wrap}
         todo[i].done = true;
         fresh[new URL(todo[i].path, SITE).href] = 'data:image/jpeg;base64,' + todo[i].b64;
       }
+      var resorted = hasAll && current.path === ALL.path && sortGrid(frame.contentDocument);
       setStatus('Saving ' + current.label + '…');
       var html = serialize(frame.contentDocument);
       var res = await gh(API + current.path, { method: 'PUT', body: {
@@ -557,8 +682,15 @@ dialog .buttons.left{justify-content:flex-start;flex-wrap:wrap}
         sha: sha, branch: BRANCH
       } });
       sha = res.content.sha; pending = []; dirty = false;
-      if (current.path === ALL.path || (!hasAll && current.path === HOME.path)) refreshPages(html);
-      setStatus('Saved. The live site updates in about a minute.', 'ok');
+      if (hasAll && current.path === ALL.path) {
+        var order = cardOrder(parse(html));
+        if (!sameOrder(order, projects)) {
+          setStatus('Updating the Previous / Next links between projects…');
+          await relinkAll(order);
+        }
+        await refreshPages(html);
+      } else if (!hasAll && current.path === HOME.path) refreshPages(html);
+      setStatus(resorted ? 'Saved, and your projects were re-sorted by start date. The live site updates in about a minute.' : 'Saved. The live site updates in about a minute.', 'ok');
     } catch (e) {
       setStatus(errText(e), 'err');
     }
@@ -592,6 +724,7 @@ dialog .buttons.left{justify-content:flex-start;flex-wrap:wrap}
       try { listText = (await getFile(ALL.path)).text; hasAll = true; }
       catch (e) { if (e.status !== 404) throw e; hasAll = false; listText = (await getFile(HOME.path)).text; }
     }
+    allText = hasAll ? listText : '';
     projects = Array.from(parse(listText).querySelectorAll(hasAll ? 'main article.pcard h3 a' : 'main article.project h3 a')).map(function (a) {
       return { path: a.getAttribute('href'), label: a.textContent.trim() };
     });
@@ -745,23 +878,27 @@ dialog .buttons.left{justify-content:flex-start;flex-wrap:wrap}
       npMsg('Creating the project page…');
       var tpl = (await getFile(first.path)).text;
       await putFile(path, buildPage(tpl, info), null, 'Add project ' + title + ' via site editor');
-      npMsg('Adding it to your home page…');
-      var idx = await getFile(HOME.path), d = parse(idx.text);
-      var rows = d.querySelectorAll('main article.project');
-      if (rows.length) rows[rows.length - 1].after(d.createTextNode('\n    '), buildRow(d, info));
-      else d.querySelector('#projects .wrap').appendChild(buildRow(d, info));
-      var homeHtml = toHtml(d);
-      await putFile(HOME.path, homeHtml, idx.sha, 'Add project ' + title + ' to home page via site editor');
-      var listHtml = homeHtml;
+      var listHtml = '';
+      if (!hasAll) {
+        npMsg('Adding it to your home page…');
+        var idx = await getFile(HOME.path), d = parse(idx.text);
+        var rows = d.querySelectorAll('main article.project');
+        if (rows.length) rows[rows.length - 1].after(d.createTextNode('\n    '), buildRow(d, info));
+        else d.querySelector('#projects .wrap').appendChild(buildRow(d, info));
+        listHtml = toHtml(d);
+        await putFile(HOME.path, listHtml, idx.sha, 'Add project ' + title + ' to home page via site editor');
+      }
       if (hasAll) {
         npMsg('Adding it to your All projects page…');
         var ap = await getFile(ALL.path), d2 = parse(ap.text);
         d2.querySelector('.pcard-grid').append(d2.createTextNode('\n        '), buildCard(d2, info), d2.createTextNode('\n      '));
+        sortGrid(d2);
         listHtml = toHtml(d2);
         await putFile(ALL.path, listHtml, ap.sha, 'Add project ' + title + ' to All projects via site editor');
       }
       npMsg('Linking it to your other projects…');
-      if (first.path === last.path) await updatePager(first, np, np);
+      if (hasAll) await relinkAll(cardOrder(parse(listHtml)));
+      else if (first.path === last.path) await updatePager(first, np, np);
       else { await updatePager(last, null, np); await updatePager(first, np, null); }
       await refreshPages(listHtml);
       busy = false; $('newDlg').close();
@@ -794,7 +931,10 @@ dialog .buttons.left{justify-content:flex-start;flex-wrap:wrap}
         listHtml = toHtml(d2);
         await putFile(ALL.path, listHtml, ap.sha, 'Remove project ' + name + ' from All projects via site editor');
       }
-      if (projects.length > 1) {
+      if (hasAll) {
+        setStatus('Updating links between projects…');
+        await relinkAll(cardOrder(parse(listHtml)).filter(function (p) { return p.path !== current.path; }));
+      } else if (projects.length > 1) {
         setStatus('Updating links between projects…');
         var prev = projects[(i - 1 + projects.length) % projects.length], next = projects[(i + 1) % projects.length];
         if (prev.path === next.path) await updatePager(prev, prev, prev);
