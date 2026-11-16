@@ -320,3 +320,26 @@ body::after {
 }
 /* The Contact link lands with "Get in touch" near the top and the desert in view below */
 .contact { scroll-margin-top: calc(1.5rem - clamp(18rem, 30vw, 28rem)); }
+
+/* ---------- Two-column timeline ----------
+   Each column runs down a line; a dot marks each entry.
+   Entries marked "now" get a solid blue dot, past ones a hollow dot. */
+.tl-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem clamp(2rem, 5vw, 4.5rem); }
+.tl-head { font: 600 1.05rem/1.2 var(--body); color: var(--muted); padding-bottom: 0.75rem; border-bottom: 1px solid var(--line); margin-bottom: 1.75rem; }
+.tl { list-style: none; margin: 0; padding: 0 0 0 1.75rem; position: relative; }
+.tl::before { content: ""; position: absolute; left: 0.3rem; top: 0.45rem; bottom: 0.5rem; width: 1.5px; background: var(--line); }
+.tl-item { position: relative; padding-bottom: 2.25rem; }
+.tl-item:last-child { padding-bottom: 0; }
+.tl-item::before {
+  content: ""; position: absolute; left: -1.75rem; top: 0.3rem;
+  width: 0.75rem; height: 0.75rem; border-radius: 50%;
+  background: var(--bg); border: 2px solid var(--muted);
+}
+.tl-item.now::before { background: var(--blue); border-color: var(--blue); box-shadow: 0 0 0 4px rgba(124, 196, 247, 0.18); }
+.tl-item .dates { color: var(--muted); font-size: 0.95rem; margin: 0 0 0.3rem; }
+.tl-item h3 { font-size: 1.6rem; }
+.tl-item .org { font-weight: 600; margin: 0.2rem 0 0.7rem; }
+.tl-item ul li { position: relative; padding-left: 1.1rem; margin-bottom: 0.4rem; max-width: 62ch; }
+.tl-item ul li::before { content: ""; position: absolute; left: 0; top: 0.72em; width: 0.5rem; height: 1.5px; background: var(--blue); }
+.tl-item:not(.now) > :not(.dates) { opacity: 0.82; }
+@media (max-width: 54rem) { .tl-grid { grid-template-columns: 1fr; } }
