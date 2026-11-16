@@ -179,7 +179,8 @@ dialog .buttons.left{justify-content:flex-start;flex-wrap:wrap}
   var KEY = 'portfolio-editor-token';
   var SITE = new URL('./', location.href).href;
   var HOME = { path: 'index.html', label: 'Home page' };
-  var pages = [HOME], projects = [];
+  var ALL = { path: 'all-projects.html', label: 'All projects page' };
+  var pages = [HOME], projects = [], hasAll = false;
   var PLACEHOLDER = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600"><rect width="800" height="600" fill="#c4ccd6"/><text x="400" y="312" font-family="Arial,sans-serif" font-size="34" fill="#55657a" text-anchor="middle">Photo coming soon</text></svg>');
   var SECTIONS = [
     ['The problem', '[What problem does this project solve, and why did it need to exist?]'],
@@ -266,7 +267,7 @@ dialog .buttons.left{justify-content:flex-start;flex-wrap:wrap}
         setup(frame.contentDocument);
         dirty = false; busy = false; setButtons();
         if (note) setStatus(note, 'ok'); else setStatus(HELP);
-        $('deleteProject').hidden = p.path === HOME.path;
+        $('deleteProject').hidden = p.path === HOME.path || p.path === ALL.path;
         $('live').href = new URL(p.path === 'index.html' ? '' : p.path, SITE).href;
       };
       frame.hidden = false;
@@ -556,7 +557,7 @@ dialog .buttons.left{justify-content:flex-start;flex-wrap:wrap}
         sha: sha, branch: BRANCH
       } });
       sha = res.content.sha; pending = []; dirty = false;
-      if (current.path === HOME.path) refreshPages(html);
+      if (current.path === ALL.path || (!hasAll && current.path === HOME.path)) refreshPages(html);
       setStatus('Saved. The live site updates in about a minute.', 'ok');
     } catch (e) {
       setStatus(errText(e), 'err');
@@ -584,12 +585,17 @@ dialog .buttons.left{justify-content:flex-start;flex-wrap:wrap}
     return e;
   }
 
-  async function refreshPages(indexText) {
-    if (!indexText) indexText = (await getFile(HOME.path)).text;
-    projects = Array.from(parse(indexText).querySelectorAll('main article.project h3 a')).map(function (a) {
+  /* The All projects page lists every project in the order they were started, so the
+     project list comes from there. Sites without that page fall back to the home page. */
+  async function refreshPages(listText) {
+    if (!listText) {
+      try { listText = (await getFile(ALL.path)).text; hasAll = true; }
+      catch (e) { if (e.status !== 404) throw e; hasAll = false; listText = (await getFile(HOME.path)).text; }
+    }
+    projects = Array.from(parse(listText).querySelectorAll(hasAll ? 'main article.pcard h3 a' : 'main article.project h3 a')).map(function (a) {
       return { path: a.getAttribute('href'), label: a.textContent.trim() };
     });
-    pages = [HOME].concat(projects);
+    pages = (hasAll ? [HOME, ALL] : [HOME]).concat(projects);
     var keep = select.value;
     select.textContent = '';
     pages.forEach(function (p) { select.appendChild(el(document, 'option', { value: p.path }, p.label)); });
@@ -664,6 +670,37 @@ dialog .buttons.left{justify-content:flex-start;flex-wrap:wrap}
     return art;
   }
 
+  function buildCard(d, info) {
+    var art = el(d, 'article', { 'class': 'pcard' });
+    var media = el(d, 'a', { 'class': 'pcard-media', href: info.path, tabindex: '-1', 'aria-hidden': 'true' });
+    media.appendChild(el(d, 'img', { src: info.homeImg, alt: '', loading: 'lazy' }));
+    art.appendChild(media);
+    var body = el(d, 'div', { 'class': 'pcard-body' }), h3 = el(d, 'h3');
+    h3.appendChild(el(d, 'a', { href: info.path }, info.title));
+    body.appendChild(h3);
+    var when = el(d, 'p', { 'class': 'when' }); fillWhen(d, when, info.dates, info.status); body.appendChild(when);
+    body.appendChild(el(d, 'p', null, info.summary || '[A one- or two-sentence summary of the project.]'));
+    if (info.nums.length) {
+      var dl = el(d, 'dl', { 'class': 'specs' });
+      info.nums.forEach(function (n) { var w = el(d, 'div'); w.appendChild(el(d, 'dt', null, n[0])); w.appendChild(el(d, 'dd', null, n[1])); dl.appendChild(w); });
+      body.appendChild(dl);
+    }
+    body.appendChild(el(d, 'a', { 'class': 'more', href: info.path }, 'Read the full write-up'));
+    art.appendChild(body);
+    return art;
+  }
+  function removeFrom(d, selector, path) {
+    var n = 0;
+    d.querySelectorAll(selector).forEach(function (a) {
+      var l = a.querySelector('h3 a');
+      if (l && l.getAttribute('href') === path) {
+        if (a.previousSibling && a.previousSibling.nodeType === 3) a.previousSibling.remove();
+        a.remove(); n++;
+      }
+    });
+    return n;
+  }
+
   function slugify(t) {
     return t.toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 50) || 'project';
   }
@@ -711,13 +748,22 @@ dialog .buttons.left{justify-content:flex-start;flex-wrap:wrap}
       npMsg('Adding it to your home page…');
       var idx = await getFile(HOME.path), d = parse(idx.text);
       var rows = d.querySelectorAll('main article.project');
-      rows[rows.length - 1].after(d.createTextNode('\n    '), buildRow(d, info));
+      if (rows.length) rows[rows.length - 1].after(d.createTextNode('\n    '), buildRow(d, info));
+      else d.querySelector('#projects .wrap').appendChild(buildRow(d, info));
       var homeHtml = toHtml(d);
       await putFile(HOME.path, homeHtml, idx.sha, 'Add project ' + title + ' to home page via site editor');
+      var listHtml = homeHtml;
+      if (hasAll) {
+        npMsg('Adding it to your All projects page…');
+        var ap = await getFile(ALL.path), d2 = parse(ap.text);
+        d2.querySelector('.pcard-grid').append(d2.createTextNode('\n        '), buildCard(d2, info), d2.createTextNode('\n      '));
+        listHtml = toHtml(d2);
+        await putFile(ALL.path, listHtml, ap.sha, 'Add project ' + title + ' to All projects via site editor');
+      }
       npMsg('Linking it to your other projects…');
       if (first.path === last.path) await updatePager(first, np, np);
       else { await updatePager(last, null, np); await updatePager(first, np, null); }
-      await refreshPages(homeHtml);
+      await refreshPages(listHtml);
       busy = false; $('newDlg').close();
       select.value = path;
       loadPage(np, 'Project created. Click the bracketed text to fill it in, then Save changes.');
@@ -729,24 +775,25 @@ dialog .buttons.left{justify-content:flex-start;flex-wrap:wrap}
   });
 
   $('deleteProject').addEventListener('click', async function () {
-    if (!current || current.path === HOME.path || busy) return;
+    if (!current || current.path === HOME.path || current.path === ALL.path || busy) return;
     var i = projects.findIndex(function (p) { return p.path === current.path; });
     if (i < 0) return;
     var name = projects[i].label;
-    if (!confirm('Delete “' + name + '”? This removes its page and its spot on your home page. You can still recover it later from your GitHub history.')) return;
+    if (!confirm('Delete “' + name + '”? This removes its page and takes it off your home page and All projects page. You can still recover it later from your GitHub history.')) return;
     busy = true; setButtons();
     try {
       setStatus('Removing it from your home page…');
       var idx = await getFile(HOME.path), d = parse(idx.text);
-      d.querySelectorAll('main article.project').forEach(function (a) {
-        var l = a.querySelector('h3 a');
-        if (l && l.getAttribute('href') === current.path) {
-          if (a.previousSibling && a.previousSibling.nodeType === 3) a.previousSibling.remove();
-          a.remove();
-        }
-      });
-      var homeHtml = toHtml(d);
-      await putFile(HOME.path, homeHtml, idx.sha, 'Remove project ' + name + ' via site editor');
+      var onHome = removeFrom(d, 'main article.project', current.path);
+      var homeHtml = toHtml(d), listHtml = homeHtml;
+      if (onHome) await putFile(HOME.path, homeHtml, idx.sha, 'Remove project ' + name + ' via site editor');
+      if (hasAll) {
+        setStatus('Removing it from your All projects page…');
+        var ap = await getFile(ALL.path), d2 = parse(ap.text);
+        removeFrom(d2, 'main article.pcard', current.path);
+        listHtml = toHtml(d2);
+        await putFile(ALL.path, listHtml, ap.sha, 'Remove project ' + name + ' from All projects via site editor');
+      }
       if (projects.length > 1) {
         setStatus('Updating links between projects…');
         var prev = projects[(i - 1 + projects.length) % projects.length], next = projects[(i + 1) % projects.length];
@@ -756,7 +803,7 @@ dialog .buttons.left{justify-content:flex-start;flex-wrap:wrap}
       setStatus('Deleting the page…');
       var f = await getFile(current.path);
       await gh(API + current.path, { method: 'DELETE', body: { message: 'Delete project ' + name + ' via site editor', sha: f.sha, branch: BRANCH } });
-      await refreshPages(homeHtml);
+      await refreshPages(listHtml);
       busy = false; dirty = false;
       select.value = HOME.path;
       loadPage(HOME, '“' + name + '” was deleted.');
