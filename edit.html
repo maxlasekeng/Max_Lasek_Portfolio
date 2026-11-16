@@ -104,7 +104,7 @@ dialog .buttons.left{justify-content:flex-start;flex-wrap:wrap}
 <dialog id="newDlg" aria-labelledby="newTitle">
   <form id="newForm">
     <h2 id="newTitle">New project</h2>
-    <p class="hint">This makes a page for the project and adds it to your All projects page in order of its start date. To show it on your home page too, use Swap project on one of your featured spots.</p>
+    <p class="hint">This makes a page for the project and adds it to your All projects page, which lists projects newest first by start date. To show it on your home page too, use Swap project on one of your featured spots.</p>
     <label for="npTitle">Project name</label>
     <input id="npTitle" maxlength="80" placeholder="e.g. Differential Wrist" required>
     <div class="row">
@@ -435,7 +435,7 @@ dialog .buttons.left{justify-content:flex-start;flex-wrap:wrap}
     if (!grid) return false;
     var cards = Array.from(grid.children).filter(function (c) { return c.matches('article.pcard'); });
     var keyed = cards.map(function (c, i) { var w = c.querySelector('.when'); return { c: c, k: startKey(w ? w.textContent : ''), i: i }; });
-    keyed.sort(function (a, b) { return a.k - b.k || a.i - b.i; });
+    keyed.sort(function (a, b) { return b.k - a.k || a.i - b.i; }); /* newest first; undated ones on top */
     if (keyed.every(function (o, i) { return o.c === cards[i]; })) return false;
     grid.textContent = '';
     keyed.forEach(function (o) { grid.append(doc.createTextNode('\n        '), o.c); });
