@@ -90,6 +90,7 @@ dialog .buttons.left{justify-content:flex-start;flex-wrap:wrap}
   <select id="page" aria-label="Page to edit"></select>
   <span class="status" id="status" role="status"></span>
   <button id="newProject">New project</button>
+  <button id="resumeBtn">Update resume</button>
   <button id="deleteProject" hidden>Delete project</button>
   <button id="discard" disabled>Discard changes</button>
   <button id="save" class="primary" disabled>Save changes</button>
@@ -98,6 +99,7 @@ dialog .buttons.left{justify-content:flex-start;flex-wrap:wrap}
 </div>
 <iframe id="frame" title="Page being edited" hidden></iframe>
 <input type="file" id="picker" accept="image/jpeg,image/png,image/webp" hidden>
+<input type="file" id="resumePicker" accept="application/pdf,.pdf" hidden>
 
 <dialog id="newDlg" aria-labelledby="newTitle">
   <form id="newForm">
@@ -208,6 +210,7 @@ dialog .buttons.left{justify-content:flex-start;flex-wrap:wrap}
     $('discard').disabled = !dirty || busy;
     select.disabled = busy;
     $('newProject').disabled = busy;
+    $('resumeBtn').disabled = busy;
     $('deleteProject').disabled = busy;
   }
   function markDirty() {
@@ -366,6 +369,40 @@ dialog .buttons.left{justify-content:flex-start;flex-wrap:wrap}
     } catch (e) {
       setStatus('That photo couldn’t be opened. Save it as a JPG or PNG and try again.', 'err');
     }
+  });
+
+  /* ---------- Resume ---------- */
+  var RESUME = 'resume/Max-Lasek-Resume.pdf';
+  $('resumeBtn').addEventListener('click', function () {
+    if (busy) return;
+    $('resumePicker').value = '';
+    $('resumePicker').click();
+  });
+  $('resumePicker').addEventListener('change', async function () {
+    var f = $('resumePicker').files[0];
+    if (!f) return;
+    if (!/\.pdf$/i.test(f.name) && f.type !== 'application/pdf') {
+      setStatus('Your resume needs to be a PDF. In Word or Google Docs, save or download it as a PDF first.', 'err');
+      return;
+    }
+    if (f.size > 20 * 1024 * 1024) {
+      setStatus('That PDF is over 20 MB. Try saving it again with a smaller file size.', 'err');
+      return;
+    }
+    if (!confirm('Replace the resume on your site with “' + f.name + '”? The Resume button on every page will open this one.')) return;
+    busy = true; setButtons();
+    try {
+      setStatus('Uploading your resume…');
+      var old = null;
+      try { old = (await gh(API + RESUME + '?ref=' + BRANCH)).sha; } catch (e) { if (e.status !== 404) throw e; }
+      var body = { message: 'Update resume via site editor', content: toB64(new Uint8Array(await f.arrayBuffer())), branch: BRANCH };
+      if (old) body.sha = old;
+      await gh(API + RESUME, { method: 'PUT', body: body });
+      setStatus('Resume updated. The Resume button will open the new one in a minute or two.', 'ok');
+    } catch (e) {
+      setStatus(errText(e), 'err');
+    }
+    busy = false; setButtons();
   });
 
   /* ---------- Photo menu and cropping ---------- */
