@@ -425,6 +425,18 @@ dialog .buttons.left{justify-content:flex-start;flex-wrap:wrap}
     var m = t.match(/\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|winter|spring|summer|fall|autumn)/);
     return +y[0] * 12 + (m && m.index < y.index ? MONTHS[m[1]] : 1);
   }
+  /* When a project ended: "present" counts as latest; one date means it started and ended then */
+  function endKey(text) {
+    var t = (text || '').toLowerCase();
+    if (/\b(present|now|current|ongoing)\b/.test(t)) return Infinity;
+    var years = [], re = /\d{4}/g, y;
+    while ((y = re.exec(t))) years.push(y);
+    if (!years.length) return Infinity;
+    var last = years[years.length - 1], mon = 12, mre = /\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|winter|spring|summer|fall|autumn)/g, m;
+    var from = years.length > 1 ? years[years.length - 2].index : -1;
+    while ((m = mre.exec(t)) && m.index < last.index) if (m.index > from) mon = MONTHS[m[1]];
+    return +last[0] * 12 + mon;
+  }
   function cardOrder(doc) {
     return Array.from(doc.querySelectorAll('main article.pcard h3 a')).map(function (a) {
       return { path: a.getAttribute('href'), label: a.textContent.trim() };
@@ -434,8 +446,14 @@ dialog .buttons.left{justify-content:flex-start;flex-wrap:wrap}
     var grid = doc.querySelector('.pcard-grid');
     if (!grid) return false;
     var cards = Array.from(grid.children).filter(function (c) { return c.matches('article.pcard'); });
-    var keyed = cards.map(function (c, i) { var w = c.querySelector('.when'); return { c: c, k: startKey(w ? w.textContent : ''), i: i }; });
-    keyed.sort(function (a, b) { return b.k - a.k || a.i - b.i; }); /* newest first; undated ones on top */
+    var keyed = cards.map(function (c, i) {
+      var w = c.querySelector('.when');
+      /* read only the dates, not the "In progress" / "Complete" label after them */
+      var t = w ? Array.from(w.childNodes).filter(function (n) { return n.nodeType === 3; }).map(function (n) { return n.nodeValue; }).join(' ') : '';
+      return { c: c, k: startKey(t), e: endKey(t), i: i };
+    });
+    /* newest start first (undated ones on top); same start: the one that ended later first */
+    keyed.sort(function (a, b) { return (b.k - a.k) || (b.e - a.e) || a.i - b.i; });
     if (keyed.every(function (o, i) { return o.c === cards[i]; })) return false;
     grid.textContent = '';
     keyed.forEach(function (o) { grid.append(doc.createTextNode('\n        '), o.c); });
